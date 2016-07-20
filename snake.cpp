@@ -1,6 +1,9 @@
 #include <iostream>
 #include <string>
 #include <deque>
+#include <vector>
+#include <numeric>
+#include <algorithm>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -33,18 +36,19 @@ SDL_Texture* snakeSegmentTexture = nullptr;
 SDL_Texture* foodTexture = nullptr;
 
 // game rects
-std::deque<SDL_Rect> snakeSegments;
+std::deque<SDL_Rect> snakeSegmentRects;
 SDL_Rect foodRect;
 
 bool initSDL();
 SDL_Texture* loadTexture(const std::string& path);
 bool loadMedia();
 bool initGame();
+bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b);
 void drawGame();
 void drawSnake();
 void updateGame();
 void updateSnake();
-void updateFood();
+void generateFood();
 void resetGame();
 
 bool initSDL() {
@@ -111,15 +115,35 @@ bool initGame() {
   return true;
 }
 
+bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b) {
+  if(a.x >= b.x + b.w) {
+    return false;
+  }
+
+  if(b.x >= a.x + a.w) {
+    return false;
+  }
+
+  if(a.y >= b.y + b.h) {
+    return false;
+  }
+
+  if(b.y >= a.y + a.h) {
+    return false;
+  }
+
+  return true;
+}
+
 void drawGame() {
   SDL_RenderClear(renderer);
   drawSnake();
-  SDL_RenderCopy(renderer, foodTexture, nullptr, &foodRect); 
+  SDL_RenderCopy(renderer, foodTexture, nullptr, &foodRect);
   SDL_RenderPresent(renderer);
 }
 
 void drawSnake() {
-	for (SDL_Rect &snakeSegment : snakeSegments) {
+	for (SDL_Rect &snakeSegment : snakeSegmentRects) {
     SDL_RenderCopy(renderer, snakeSegmentTexture, nullptr, &snakeSegment);
 	}
 }
@@ -147,53 +171,73 @@ void updateSnake() {
     direction = DIRECTIONS::RIGHT;
   }
 
-  SDL_Rect head = snakeSegments.front();
+  SDL_Rect headRect = snakeSegmentRects.front();
 
   if(direction == DIRECTIONS::UP) {
-    head.y -= SNAKE_SEGMENT_HEIGHT;
+    headRect.y -= SNAKE_SEGMENT_HEIGHT;
   }
 
   if(direction == DIRECTIONS::DOWN) {
-    head.y += SNAKE_SEGMENT_HEIGHT;
+    headRect.y += SNAKE_SEGMENT_HEIGHT;
   }
 
   if(direction == DIRECTIONS::LEFT) {
-    head.x -= SNAKE_SEGMENT_WIDTH;
+    headRect.x -= SNAKE_SEGMENT_WIDTH;
   }
 
   if(direction == DIRECTIONS::RIGHT) {
-    head.x += SNAKE_SEGMENT_WIDTH;
+    headRect.x += SNAKE_SEGMENT_WIDTH;
   }
 
-  snakeSegments.push_front(head);
-  snakeSegments.pop_back();
+  snakeSegmentRects.push_front(headRect);
 
-  SDL_Delay(300);
+	if(rectsIntersects(headRect, foodRect)) {
+		// foodRect.x = -32;
+		// foodRect.y = -32;
+		generateFood();
+	}
+	else {
+		snakeSegmentRects.pop_back();
+	}
+
+  SDL_Delay(150);
 }
 
-void updateFood() {
+int random(int min, int max) //range : [min, max)
+{
+   static bool first = true;
+   if (first)
+   {
+      srand(time(NULL)); //seeding for the first time only!
+      first = false;
+   }
+   return min + rand() % (max - min);
+}
 
+void generateFood() {
+  foodRect.x = random(0, 32) * 32;
+	foodRect.y = random(0, 24) * 32;
 }
 
 void resetGame() {
 
-  snakeSegments.push_back({
-    SCREEN_WIDTH_HALF - SNAKE_SEGMENT_WIDTH_HALF,
-		SCREEN_HEIGHT_HALF - SNAKE_SEGMENT_HEIGHT_HALF,
+  snakeSegmentRects.push_back({
+    SNAKE_SEGMENT_WIDTH * 16,
+		SNAKE_SEGMENT_HEIGHT * 12,
 		SNAKE_SEGMENT_WIDTH,
 		SNAKE_SEGMENT_HEIGHT
   });
 
-  snakeSegments.push_back({
-    SCREEN_WIDTH_HALF - SNAKE_SEGMENT_WIDTH_HALF,
-		SCREEN_HEIGHT_HALF - SNAKE_SEGMENT_HEIGHT_HALF - SNAKE_SEGMENT_WIDTH,
+  snakeSegmentRects.push_back({
+    SNAKE_SEGMENT_WIDTH * 16,
+		SNAKE_SEGMENT_HEIGHT * 12 - SNAKE_SEGMENT_HEIGHT,
 		SNAKE_SEGMENT_WIDTH,
 		SNAKE_SEGMENT_HEIGHT
   });
 
-  snakeSegments.push_back({
-    SCREEN_WIDTH_HALF - SNAKE_SEGMENT_WIDTH_HALF,
-		SCREEN_HEIGHT_HALF - SNAKE_SEGMENT_HEIGHT_HALF - SNAKE_SEGMENT_WIDTH * 2,
+  snakeSegmentRects.push_back({
+    SNAKE_SEGMENT_WIDTH * 16,
+		SNAKE_SEGMENT_HEIGHT * 12 - SNAKE_SEGMENT_HEIGHT * 2,
 		SNAKE_SEGMENT_WIDTH,
 		SNAKE_SEGMENT_HEIGHT
   });
