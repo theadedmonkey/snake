@@ -137,6 +137,7 @@ bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b) {
 
 void drawGame() {
   SDL_RenderClear(renderer);
+	SDL_SetRenderDrawColor(renderer, 210, 180, 140, 255);
   drawSnake();
   SDL_RenderCopy(renderer, foodTexture, nullptr, &foodRect);
   SDL_RenderPresent(renderer);
@@ -193,6 +194,7 @@ void updateSnake() {
 
   snakeSegmentRects.push_front(headRect);
 
+  // check collisions of snake with food
 	if(rectsIntersects(headRect, foodRect)) {
 		generateFood();
 	}
@@ -224,20 +226,41 @@ void updateSnake() {
 
 }
 
-int random(int min, int max) //range : [min, max)
-{
-   static bool first = true;
-   if (first)
-   {
-      srand(time(NULL)); //seeding for the first time only!
-      first = false;
-   }
-   return min + rand() % (max - min);
+//range : [min, max) mx no inclusive
+int random(int min, int max) {
+  static bool first = true;
+  if (first) {
+	  //seeding for the first time only!
+    srand(time(NULL));
+    first = false;
+  }
+  return min + rand() % (max - min);
 }
 
 void generateFood() {
-  foodRect.x = random(0, 32) * 32;
-	foodRect.y = random(0, 24) * 32;
+  std::vector<int> exCols;
+	std::vector<int> exRows;
+	for (auto &snakeSegmentRect : snakeSegmentRects) {
+		exCols.push_back(snakeSegmentRect.x / 32);
+		exRows.push_back(snakeSegmentRect.y / 32);
+	}
+
+  std::vector<int> xs;
+	for (int i = 0; i < 32; i++) {
+		if(std::find(exCols.begin(), exCols.end(), i) == exCols.end()) {
+			xs.push_back(i);
+		}
+	}
+
+	std::vector<int> ys;
+	for (int i = 0; i < 24; i++) {
+		if(std::find(exRows.begin(), exRows.end(), i) == exRows.end()) {
+			ys.push_back(i);
+		}
+	}
+
+	foodRect.x = xs[random(0, xs.size())] * 32;
+	foodRect.y = ys[random(0, ys.size())] * 32;
 }
 
 void resetGame() {
@@ -266,7 +289,8 @@ void resetGame() {
 		SNAKE_SEGMENT_HEIGHT
   });
 
-  foodRect = { 32, 64, 32, 32 };
+  foodRect = { -32, -32, 32, 32 };
+	generateFood();
 }
 
 int main( int argc, char* args[] ) {
