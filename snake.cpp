@@ -155,19 +155,19 @@ void updateGame() {
 void updateSnake() {
   Uint8 *keys = (Uint8*)SDL_GetKeyboardState(NULL);
 
-  if(keys[SDL_SCANCODE_UP]) {
+  if(keys[SDL_SCANCODE_UP] && direction != DIRECTIONS::DOWN) {
     direction = DIRECTIONS::UP;
   }
 
-  if(keys[SDL_SCANCODE_DOWN]) {
+  if(keys[SDL_SCANCODE_DOWN] && direction != DIRECTIONS::UP) {
     direction = DIRECTIONS::DOWN;
   }
 
-  if(keys[SDL_SCANCODE_LEFT]) {
+  if(keys[SDL_SCANCODE_LEFT] && direction != DIRECTIONS::RIGHT) {
     direction = DIRECTIONS::LEFT;
   }
 
-  if(keys[SDL_SCANCODE_RIGHT]) {
+  if(keys[SDL_SCANCODE_RIGHT] && direction != DIRECTIONS::LEFT) {
     direction = DIRECTIONS::RIGHT;
   }
 
