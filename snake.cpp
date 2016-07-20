@@ -24,7 +24,7 @@ SDL_Renderer* renderer = nullptr;
 
 // game object constants
 enum class DIRECTIONS { UP, DOWN, LEFT, RIGHT };
-DIRECTIONS direction = DIRECTIONS::DOWN;
+DIRECTIONS direction;
 
 const int SNAKE_SEGMENT_WIDTH = 32;
 const int SNAKE_SEGMENT_WIDTH_HALF = SNAKE_SEGMENT_WIDTH / 2;
@@ -153,6 +153,7 @@ void updateGame() {
 }
 
 void updateSnake() {
+	// snake direction
   Uint8 *keys = (Uint8*)SDL_GetKeyboardState(NULL);
 
   if(keys[SDL_SCANCODE_UP] && direction != DIRECTIONS::DOWN) {
@@ -171,6 +172,7 @@ void updateSnake() {
     direction = DIRECTIONS::RIGHT;
   }
 
+  // snake movement
   SDL_Rect headRect = snakeSegmentRects.front();
 
   if(direction == DIRECTIONS::UP) {
@@ -192,8 +194,6 @@ void updateSnake() {
   snakeSegmentRects.push_front(headRect);
 
 	if(rectsIntersects(headRect, foodRect)) {
-		// foodRect.x = -32;
-		// foodRect.y = -32;
 		generateFood();
 	}
 	else {
@@ -201,6 +201,18 @@ void updateSnake() {
 	}
 
   SDL_Delay(150);
+
+	// check collisions with screen
+	if(
+		 headRect.x < 0 ||
+		 headRect.x + SNAKE_SEGMENT_WIDTH > SCREEN_WIDTH ||
+		 headRect.y < 0 ||
+		 headRect.y + SNAKE_SEGMENT_HEIGHT > SCREEN_HEIGHT
+	 ) {
+		SDL_Delay(500);
+    resetGame();
+  }
+
 }
 
 int random(int min, int max) //range : [min, max)
@@ -220,6 +232,9 @@ void generateFood() {
 }
 
 void resetGame() {
+
+  direction = DIRECTIONS::DOWN;
+  snakeSegmentRects.clear();
 
   snakeSegmentRects.push_back({
     SNAKE_SEGMENT_WIDTH * 16,
