@@ -202,14 +202,23 @@ void updateSnake() {
 
   SDL_Delay(150);
 
-	// check collisions with screen
+  // check collisions of snake with itself
+	for (auto i = 1; i < snakeSegmentRects.size(); i++) {
+	  if (rectsIntersects(headRect, snakeSegmentRects[i])) {
+			SDL_Delay(500);
+			resetGame();
+			break;
+		}
+	}
+
+	// check collisions of snake with screen
 	if(
-		 headRect.x < 0 ||
-		 headRect.x + SNAKE_SEGMENT_WIDTH > SCREEN_WIDTH ||
-		 headRect.y < 0 ||
-		 headRect.y + SNAKE_SEGMENT_HEIGHT > SCREEN_HEIGHT
+	  headRect.x < 0 ||
+		headRect.x + SNAKE_SEGMENT_WIDTH > SCREEN_WIDTH ||
+		headRect.y < 0 ||
+		headRect.y + SNAKE_SEGMENT_HEIGHT > SCREEN_HEIGHT
 	 ) {
-		SDL_Delay(500);
+	  SDL_Delay(500);
     resetGame();
   }
 
