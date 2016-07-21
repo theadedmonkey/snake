@@ -4,6 +4,7 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <utility>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -23,6 +24,8 @@ SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
 // game object constants
+std::vector<std::pair<int, int>> tileCoords;
+
 enum class DIRECTIONS { UP, DOWN, LEFT, RIGHT };
 DIRECTIONS direction;
 
@@ -48,6 +51,12 @@ void drawGame();
 void drawSnake();
 void updateGame();
 void updateSnake();
+int random(int min, int max);
+std::vector<std::pair<int, int>> difference(
+	const std::vector<std::pair<int, int>> &a,
+	const std::vector<std::pair<int, int>> &b
+);
+void generateTileCoords();
 void generateFood();
 void resetGame();
 
@@ -109,6 +118,8 @@ bool initGame() {
   if(!loadMedia()) {
     return false;
   }
+
+  generateTileCoords();
 
   resetGame();
 
@@ -226,7 +237,7 @@ void updateSnake() {
 
 }
 
-//range : [min, max) mx no inclusive
+// range : [min, max) max no inclusive
 int random(int min, int max) {
   static bool first = true;
   if (first) {
@@ -237,30 +248,52 @@ int random(int min, int max) {
   return min + rand() % (max - min);
 }
 
+// Finds the set (i.e. no duplicates) of all elements in the
+// first vector not contained in the second vector.
+std::vector<std::pair<int, int>> difference(
+	const std::vector<std::pair<int, int>> &a,
+  const std::vector<std::pair<int, int>> &b
+) {
+  std::vector<std::pair<int, int>> out;
+	int idx = 0;
+	unsigned int aSize = a.size();
+	while (idx < aSize) {
+		if (
+		  std::find(b.begin(), b.end(), a[idx]) == b.end() &&
+	    std::find(out.begin(), out.end(), a[idx]) == out.end()
+		) {
+			out.push_back(a[idx]);
+		}
+		idx++;
+	}
+  return out;
+}
+
+void generateTileCoords() {
+  for (auto x = 0; x < 32; x++) {
+	  for (auto y = 0; y < 24; y++) {
+		  tileCoords.push_back(std::pair<int, int>(x * 32, y * 32));
+	  }
+  }
+}
+
 void generateFood() {
-  std::vector<int> exCols;
-	std::vector<int> exRows;
+	std::pair<int, int> position;
+  std::vector<std::pair<int, int>> excludedTileCoords;
+	std::vector<std::pair<int, int>> availableTileCoords;
+  // take the x y coords of all snake segments
 	for (auto &snakeSegmentRect : snakeSegmentRects) {
-		exCols.push_back(snakeSegmentRect.x / 32);
-		exRows.push_back(snakeSegmentRect.y / 32);
+		excludedTileCoords.push_back(std::pair<int, int>(
+			snakeSegmentRect.x, snakeSegmentRect.y
+		));
 	}
-
-  std::vector<int> xs;
-	for (int i = 0; i < 32; i++) {
-		if(std::find(exCols.begin(), exCols.end(), i) == exCols.end()) {
-			xs.push_back(i);
-		}
-	}
-
-	std::vector<int> ys;
-	for (int i = 0; i < 24; i++) {
-		if(std::find(exRows.begin(), exRows.end(), i) == exRows.end()) {
-			ys.push_back(i);
-		}
-	}
-
-	foodRect.x = xs[random(0, xs.size())] * 32;
-	foodRect.y = ys[random(0, ys.size())] * 32;
+  // take all x y free coords
+  availableTileCoords = difference(tileCoords, excludedTileCoords);
+	// take one free coord randomly
+	position = availableTileCoords[random(0, availableTileCoords.size())];
+  // update food position
+	foodRect.x = position.first;
+	foodRect.y = position.second;
 }
 
 void resetGame() {
@@ -294,6 +327,21 @@ void resetGame() {
 }
 
 int main( int argc, char* args[] ) {
+
+	std::vector<std::pair<int, int>> a;
+	a.push_back(std::pair<int, int>(1, 2));
+	a.push_back(std::pair<int, int>(3, 4));
+
+	std::vector<std::pair<int, int>> b;
+	b.push_back(std::pair<int, int>(1, 2));
+
+	std::vector<std::pair<int, int>> out;
+	out = difference(a, b);
+
+	for (auto i = 0; i < out.size(); i++) {
+		std::cout << out[i].first << " " << out[i].second << std::endl;
+	}
+
   if(!initGame()) {
     return 0;
   }
