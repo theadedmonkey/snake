@@ -16,7 +16,7 @@ const int SCREEN_WIDTH_HALF = SCREEN_WIDTH / 2;
 const int SCREEN_HEIGHT = 768;
 const int SCREEN_HEIGHT_HALF = SCREEN_HEIGHT / 2;
 
-const int FPS = 60;
+const int FPS = 15;
 const int DELAY_TIME = 1000.0f / FPS;
 
 // window and renderer
@@ -24,6 +24,9 @@ SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
 // game object constants
+enum class GAME_STATES { SPLASH, RUNNING };
+GAME_STATES gameState;
+
 std::vector<std::pair<int, int>> tileCoords;
 
 enum class DIRECTIONS { UP, DOWN, LEFT, RIGHT };
@@ -35,10 +38,12 @@ const int SNAKE_SEGMENT_HEIGHT = 32;
 const int SNAKE_SEGMENT_HEIGHT_HALF = SNAKE_SEGMENT_HEIGHT / 2;
 
 // game textures
+SDL_Texture* splashTexture = nullptr;
 SDL_Texture* snakeSegmentTexture = nullptr;
 SDL_Texture* foodTexture = nullptr;
 
 // game rects
+SDL_Rect splashRect;
 std::deque<SDL_Rect> snakeSegmentRects;
 SDL_Rect foodRect;
 
@@ -47,9 +52,13 @@ SDL_Texture* loadTexture(const std::string& path);
 bool loadMedia();
 bool initGame();
 bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b);
+void drawScreen();
 void drawGame();
+void drawSplash();
 void drawSnake();
+void updateScreen();
 void updateGame();
+void updateSplash();
 void updateSnake();
 int random(int min, int max);
 std::vector<std::pair<int, int>> difference(
@@ -97,6 +106,11 @@ SDL_Texture* loadTexture(const std::string &path) {
 }
 
 bool loadMedia() {
+  splashTexture = loadTexture("assets/splash.png");
+	if(!splashTexture) {
+		return false;
+	}
+
   snakeSegmentTexture = loadTexture("assets/snake-segment.png");
   if(!snakeSegmentTexture) {
     return false;
@@ -118,6 +132,10 @@ bool initGame() {
   if(!loadMedia()) {
     return false;
   }
+
+  splashRect = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+
+  gameState = GAME_STATES::SPLASH;
 
   generateTileCoords();
 
@@ -146,12 +164,30 @@ bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b) {
   return true;
 }
 
+void drawScreen() {
+	SDL_RenderClear(renderer);
+
+	if (gameState == GAME_STATES::SPLASH) {
+		drawSplash();
+	}
+
+	if (gameState == GAME_STATES::RUNNING) {
+		drawGame();
+	}
+
+	SDL_RenderPresent(renderer);
+}
+
 void drawGame() {
   SDL_RenderClear(renderer);
-	SDL_SetRenderDrawColor(renderer, 210, 180, 140, 255);
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   drawSnake();
   SDL_RenderCopy(renderer, foodTexture, nullptr, &foodRect);
   SDL_RenderPresent(renderer);
+}
+
+void drawSplash() {
+	SDL_RenderCopy(renderer, splashTexture, nullptr, &splashRect);
 }
 
 void drawSnake() {
@@ -160,8 +196,26 @@ void drawSnake() {
 	}
 }
 
+void updateScreen() {
+	if (gameState == GAME_STATES::SPLASH) {
+		updateSplash();
+	}
+
+	if (gameState == GAME_STATES::RUNNING) {
+		updateGame();
+	}
+}
+
 void updateGame() {
   updateSnake();
+}
+
+void updateSplash() {
+	Uint8 *keys = (Uint8*)SDL_GetKeyboardState(NULL);
+	if(keys[SDL_SCANCODE_RETURN]) {
+	  resetGame();
+		gameState = GAME_STATES::RUNNING;
+	}
 }
 
 void updateSnake() {
@@ -212,8 +266,6 @@ void updateSnake() {
 	else {
 		snakeSegmentRects.pop_back();
 	}
-
-  SDL_Delay(150);
 
   // check collisions of snake with itself
 	for (auto i = 1; i < snakeSegmentRects.size(); i++) {
@@ -327,21 +379,6 @@ void resetGame() {
 }
 
 int main( int argc, char* args[] ) {
-
-	std::vector<std::pair<int, int>> a;
-	a.push_back(std::pair<int, int>(1, 2));
-	a.push_back(std::pair<int, int>(3, 4));
-
-	std::vector<std::pair<int, int>> b;
-	b.push_back(std::pair<int, int>(1, 2));
-
-	std::vector<std::pair<int, int>> out;
-	out = difference(a, b);
-
-	for (auto i = 0; i < out.size(); i++) {
-		std::cout << out[i].first << " " << out[i].second << std::endl;
-	}
-
   if(!initGame()) {
     return 0;
   }
@@ -357,8 +394,8 @@ int main( int argc, char* args[] ) {
 				isRunning = false;
 			}
     }
-    updateGame();
-    drawGame();
+		updateScreen();
+		drawScreen();
 
     int frameTime = SDL_GetTicks() - oldTime;
     if(frameTime < DELAY_TIME) {
