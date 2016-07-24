@@ -24,13 +24,13 @@ SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
 // game object constants
-enum class GAME_STATES { SPLASH, RUNNING };
-GAME_STATES gameState;
+enum class GAME_SCENES { SPLASH, PLAY, PAUSED };
+GAME_SCENES gameScene;
 
 std::vector<std::pair<int, int>> tileCoords;
 
-enum class DIRECTIONS { UP, DOWN, LEFT, RIGHT };
-DIRECTIONS direction;
+enum class SNAKE_DIRECTIONS { UP, DOWN, LEFT, RIGHT };
+SNAKE_DIRECTIONS snakeDirection;
 
 const int SNAKE_SEGMENT_WIDTH = 32;
 const int SNAKE_SEGMENT_WIDTH_HALF = SNAKE_SEGMENT_WIDTH / 2;
@@ -39,11 +39,13 @@ const int SNAKE_SEGMENT_HEIGHT_HALF = SNAKE_SEGMENT_HEIGHT / 2;
 
 // game textures
 SDL_Texture* splashTexture = nullptr;
+SDL_Texture* pausedTexture = nullptr;
 SDL_Texture* snakeSegmentTexture = nullptr;
 SDL_Texture* foodTexture = nullptr;
 
 // game rects
 SDL_Rect splashRect;
+SDL_Rect pausedRect;
 std::deque<SDL_Rect> snakeSegmentRects;
 SDL_Rect foodRect;
 
@@ -52,12 +54,13 @@ SDL_Texture* loadTexture(const std::string& path);
 bool loadMedia();
 bool initGame();
 bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b);
-void drawScreen();
-void drawGame();
+void drawScene();
+void drawPlay();
 void drawSplash();
+void drawPaused();
 void drawSnake();
-void updateScreen();
-void updateGame();
+void updateScene();
+void updatePlay();
 void updateSplash();
 void updateSnake();
 int random(int min, int max);
@@ -67,7 +70,7 @@ std::vector<std::pair<int, int>> difference(
 );
 void generateTileCoords();
 void generateFood();
-void resetGame();
+void resetPlay();
 
 bool initSDL() {
 	if (SDL_Init( SDL_INIT_EVERYTHING ) == -1 ) {
@@ -111,6 +114,11 @@ bool loadMedia() {
 		return false;
 	}
 
+  pausedTexture = loadTexture("assets/paused.jpg");
+	if(!pausedTexture) {
+		return false;
+	}
+
   snakeSegmentTexture = loadTexture("assets/snake-segment.png");
   if(!snakeSegmentTexture) {
     return false;
@@ -134,12 +142,15 @@ bool initGame() {
   }
 
   splashRect = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+  // w = 500
+	// h = 100
+	pausedRect = { SCREEN_WIDTH_HALF - 500 / 2, SCREEN_HEIGHT_HALF - 100 / 2, 500, 100 };
 
-  gameState = GAME_STATES::SPLASH;
+  gameScene = GAME_SCENES::SPLASH;
 
   generateTileCoords();
 
-  resetGame();
+  resetPlay();
 
   return true;
 }
@@ -164,21 +175,25 @@ bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b) {
   return true;
 }
 
-void drawScreen() {
+void drawScene() {
 	SDL_RenderClear(renderer);
 
-	if (gameState == GAME_STATES::SPLASH) {
+	if (gameScene == GAME_SCENES::SPLASH) {
 		drawSplash();
 	}
 
-	if (gameState == GAME_STATES::RUNNING) {
-		drawGame();
+	if (gameScene == GAME_SCENES::PLAY) {
+		drawPlay();
+	}
+
+	if (gameScene == GAME_SCENES::PAUSED) {
+		drawPaused();
 	}
 
 	SDL_RenderPresent(renderer);
 }
 
-void drawGame() {
+void drawPlay() {
   SDL_RenderClear(renderer);
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
   drawSnake();
@@ -190,70 +205,76 @@ void drawSplash() {
 	SDL_RenderCopy(renderer, splashTexture, nullptr, &splashRect);
 }
 
+void drawPaused() {
+	drawPlay();
+	SDL_RenderCopy(renderer, pausedTexture, nullptr, &pausedRect);
+}
+
 void drawSnake() {
 	for (SDL_Rect &snakeSegment : snakeSegmentRects) {
     SDL_RenderCopy(renderer, snakeSegmentTexture, nullptr, &snakeSegment);
 	}
 }
 
-void updateScreen() {
-	if (gameState == GAME_STATES::SPLASH) {
+void updateScene() {
+	if (gameScene == GAME_SCENES::SPLASH) {
 		updateSplash();
 	}
 
-	if (gameState == GAME_STATES::RUNNING) {
-		updateGame();
+	if (gameScene == GAME_SCENES::PLAY) {
+		updatePlay();
 	}
+
 }
 
-void updateGame() {
+void updatePlay() {
   updateSnake();
 }
 
 void updateSplash() {
 	Uint8 *keys = (Uint8*)SDL_GetKeyboardState(NULL);
 	if(keys[SDL_SCANCODE_RETURN]) {
-	  resetGame();
-		gameState = GAME_STATES::RUNNING;
+	  resetPlay();
+		gameScene = GAME_SCENES::PLAY;
 	}
 }
 
 void updateSnake() {
-	// snake direction
+	// snake snakeDirection
   Uint8 *keys = (Uint8*)SDL_GetKeyboardState(NULL);
 
-  if(keys[SDL_SCANCODE_UP] && direction != DIRECTIONS::DOWN) {
-    direction = DIRECTIONS::UP;
+  if(keys[SDL_SCANCODE_UP] && snakeDirection != SNAKE_DIRECTIONS::DOWN) {
+    snakeDirection = SNAKE_DIRECTIONS::UP;
   }
 
-  if(keys[SDL_SCANCODE_DOWN] && direction != DIRECTIONS::UP) {
-    direction = DIRECTIONS::DOWN;
+  if(keys[SDL_SCANCODE_DOWN] && snakeDirection != SNAKE_DIRECTIONS::UP) {
+    snakeDirection = SNAKE_DIRECTIONS::DOWN;
   }
 
-  if(keys[SDL_SCANCODE_LEFT] && direction != DIRECTIONS::RIGHT) {
-    direction = DIRECTIONS::LEFT;
+  if(keys[SDL_SCANCODE_LEFT] && snakeDirection != SNAKE_DIRECTIONS::RIGHT) {
+    snakeDirection = SNAKE_DIRECTIONS::LEFT;
   }
 
-  if(keys[SDL_SCANCODE_RIGHT] && direction != DIRECTIONS::LEFT) {
-    direction = DIRECTIONS::RIGHT;
+  if(keys[SDL_SCANCODE_RIGHT] && snakeDirection != SNAKE_DIRECTIONS::LEFT) {
+    snakeDirection = SNAKE_DIRECTIONS::RIGHT;
   }
 
   // snake movement
   SDL_Rect headRect = snakeSegmentRects.front();
 
-  if(direction == DIRECTIONS::UP) {
+  if(snakeDirection == SNAKE_DIRECTIONS::UP) {
     headRect.y -= SNAKE_SEGMENT_HEIGHT;
   }
 
-  if(direction == DIRECTIONS::DOWN) {
+  if(snakeDirection == SNAKE_DIRECTIONS::DOWN) {
     headRect.y += SNAKE_SEGMENT_HEIGHT;
   }
 
-  if(direction == DIRECTIONS::LEFT) {
+  if(snakeDirection == SNAKE_DIRECTIONS::LEFT) {
     headRect.x -= SNAKE_SEGMENT_WIDTH;
   }
 
-  if(direction == DIRECTIONS::RIGHT) {
+  if(snakeDirection == SNAKE_DIRECTIONS::RIGHT) {
     headRect.x += SNAKE_SEGMENT_WIDTH;
   }
 
@@ -271,7 +292,7 @@ void updateSnake() {
 	for (auto i = 1; i < snakeSegmentRects.size(); i++) {
 	  if (rectsIntersects(headRect, snakeSegmentRects[i])) {
 			SDL_Delay(500);
-			resetGame();
+			resetPlay();
 			break;
 		}
 	}
@@ -284,7 +305,7 @@ void updateSnake() {
 		headRect.y + SNAKE_SEGMENT_HEIGHT > SCREEN_HEIGHT
 	 ) {
 	  SDL_Delay(500);
-    resetGame();
+    resetPlay();
   }
 
 }
@@ -348,9 +369,9 @@ void generateFood() {
 	foodRect.y = position.second;
 }
 
-void resetGame() {
+void resetPlay() {
 
-  direction = DIRECTIONS::DOWN;
+  snakeDirection = SNAKE_DIRECTIONS::DOWN;
   snakeSegmentRects.clear();
 
   snakeSegmentRects.push_back({
@@ -383,19 +404,32 @@ int main( int argc, char* args[] ) {
     return 0;
   }
 
-	SDL_Event e;
+	SDL_Event event;
   bool isRunning = true;
 
   while(isRunning) {
     long int oldTime = SDL_GetTicks();
 
-    while(SDL_PollEvent(&e) != 0) {
-			if(e.type == SDL_QUIT) {
+    while(SDL_PollEvent(&event) != 0) {
+			// close the game
+			if(event.type == SDL_QUIT) {
 				isRunning = false;
 			}
+			// game pause logic
+			if(event.type == SDL_KEYDOWN) {
+			  if(event.key.keysym.sym == SDLK_ESCAPE) {
+          if(gameScene == GAME_SCENES::PLAY) {
+						gameScene = GAME_SCENES::PAUSED;
+					}
+					else if(gameScene == GAME_SCENES::PAUSED) {
+						gameScene = GAME_SCENES::PLAY;
+					}
+				}
+			}
     }
-		updateScreen();
-		drawScreen();
+
+		updateScene();
+		drawScene();
 
     int frameTime = SDL_GetTicks() - oldTime;
     if(frameTime < DELAY_TIME) {
