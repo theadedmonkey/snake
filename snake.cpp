@@ -2,20 +2,19 @@
 #include <string>
 #include <deque>
 #include <vector>
-#include <numeric>
 #include <algorithm>
-#include <utility>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 
-// Screen dimension constants
+// screen dimension constants
 const int SCREEN_WIDTH = 1024;
 const int SCREEN_WIDTH_HALF = SCREEN_WIDTH / 2;
 
 const int SCREEN_HEIGHT = 768;
 const int SCREEN_HEIGHT_HALF = SCREEN_HEIGHT / 2;
 
+// FPS constants
 const int FPS = 15;
 const int DELAY_TIME = 1000.0f / FPS;
 
@@ -23,8 +22,8 @@ const int DELAY_TIME = 1000.0f / FPS;
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
-// game object constants
-enum class GAME_SCENES { SPLASH, PLAY, PAUSED };
+// game data
+enum class GAME_SCENES { SPLASH, PLAY, PAUSED, GAME_OVER };
 GAME_SCENES gameScene;
 
 std::vector<std::pair<int, int>> tileCoords;
@@ -40,12 +39,14 @@ const int SNAKE_SEGMENT_HEIGHT_HALF = SNAKE_SEGMENT_HEIGHT / 2;
 // game textures
 SDL_Texture* splashTexture = nullptr;
 SDL_Texture* pausedTexture = nullptr;
+SDL_Texture* gameOverTexture = nullptr;
 SDL_Texture* snakeSegmentTexture = nullptr;
 SDL_Texture* foodTexture = nullptr;
 
 // game rects
 SDL_Rect splashRect;
 SDL_Rect pausedRect;
+SDL_Rect gameOverRect;
 std::deque<SDL_Rect> snakeSegmentRects;
 SDL_Rect foodRect;
 
@@ -58,10 +59,12 @@ void drawScene();
 void drawPlay();
 void drawSplash();
 void drawPaused();
+void drawGameOver();
 void drawSnake();
 void updateScene();
 void updatePlay();
 void updateSplash();
+void updateGameOver();
 void updateSnake();
 int random(int min, int max);
 std::vector<std::pair<int, int>> difference(
@@ -119,6 +122,11 @@ bool loadMedia() {
 		return false;
 	}
 
+	gameOverTexture = loadTexture("assets/game-over.jpg");
+	if(!gameOverTexture) {
+		return false;
+	}
+
   snakeSegmentTexture = loadTexture("assets/snake-segment.png");
   if(!snakeSegmentTexture) {
     return false;
@@ -145,6 +153,9 @@ bool initGame() {
   // w = 500
 	// h = 100
 	pausedRect = { SCREEN_WIDTH_HALF - 500 / 2, SCREEN_HEIGHT_HALF - 100 / 2, 500, 100 };
+  // w = 500
+	// h = 200
+	gameOverRect = { SCREEN_WIDTH_HALF - 500 / 2, SCREEN_HEIGHT_HALF - 200 / 2, 500, 200 };
 
   gameScene = GAME_SCENES::SPLASH;
 
@@ -190,6 +201,10 @@ void drawScene() {
 		drawPaused();
 	}
 
+	if (gameScene == GAME_SCENES::GAME_OVER) {
+		drawGameOver();
+	}
+
 	SDL_RenderPresent(renderer);
 }
 
@@ -210,6 +225,11 @@ void drawPaused() {
 	SDL_RenderCopy(renderer, pausedTexture, nullptr, &pausedRect);
 }
 
+void drawGameOver() {
+	drawPlay();
+	SDL_RenderCopy(renderer, gameOverTexture, nullptr, &gameOverRect);
+}
+
 void drawSnake() {
 	for (SDL_Rect &snakeSegment : snakeSegmentRects) {
     SDL_RenderCopy(renderer, snakeSegmentTexture, nullptr, &snakeSegment);
@@ -225,6 +245,10 @@ void updateScene() {
 		updatePlay();
 	}
 
+	if (gameScene == GAME_SCENES::GAME_OVER) {
+		updateGameOver();
+	}
+
 }
 
 void updatePlay() {
@@ -236,6 +260,13 @@ void updateSplash() {
 	if(keys[SDL_SCANCODE_RETURN]) {
 	  resetPlay();
 		gameScene = GAME_SCENES::PLAY;
+	}
+}
+
+void updateGameOver() {
+	Uint8 *keys = (Uint8*)SDL_GetKeyboardState(NULL);
+	if(keys[SDL_SCANCODE_SPACE]) {
+	  gameScene = GAME_SCENES::SPLASH;
 	}
 }
 
@@ -291,8 +322,7 @@ void updateSnake() {
   // check collisions of snake with itself
 	for (auto i = 1; i < snakeSegmentRects.size(); i++) {
 	  if (rectsIntersects(headRect, snakeSegmentRects[i])) {
-			SDL_Delay(500);
-			resetPlay();
+			gameScene = GAME_SCENES::GAME_OVER;
 			break;
 		}
 	}
@@ -304,8 +334,7 @@ void updateSnake() {
 		headRect.y < 0 ||
 		headRect.y + SNAKE_SEGMENT_HEIGHT > SCREEN_HEIGHT
 	 ) {
-	  SDL_Delay(500);
-    resetPlay();
+		gameScene = GAME_SCENES::GAME_OVER;
   }
 
 }
