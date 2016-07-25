@@ -22,12 +22,22 @@ const int DELAY_TIME = 1000.0f / FPS;
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
-// game data
+// score
+int score;
+
+// score font
+TTF_Font* scoreFont = nullptr;
+const int SCORE_FONT_SIZE = 24;
+SDL_Color SCORE_FONT_COLOR = { 000, 000, 000, 255 };
+
+// game scenes
 enum class GAME_SCENES { SPLASH, PLAY, PAUSED, GAME_OVER };
 GAME_SCENES gameScene;
 
+// tiles coordinates
 std::vector<std::pair<int, int>> tileCoords;
 
+// snake
 enum class SNAKE_DIRECTIONS { UP, DOWN, LEFT, RIGHT };
 SNAKE_DIRECTIONS snakeDirection;
 
@@ -37,6 +47,7 @@ const int SNAKE_SEGMENT_HEIGHT = 32;
 const int SNAKE_SEGMENT_HEIGHT_HALF = SNAKE_SEGMENT_HEIGHT / 2;
 
 // game textures
+SDL_Texture* scoreTexture = nullptr;
 SDL_Texture* splashTexture = nullptr;
 SDL_Texture* pausedTexture = nullptr;
 SDL_Texture* gameOverTexture = nullptr;
@@ -44,6 +55,7 @@ SDL_Texture* snakeSegmentTexture = nullptr;
 SDL_Texture* foodTexture = nullptr;
 
 // game rects
+SDL_Rect scoreRect;
 SDL_Rect splashRect;
 SDL_Rect pausedRect;
 SDL_Rect gameOverRect;
@@ -52,6 +64,7 @@ SDL_Rect foodRect;
 
 bool initSDL();
 SDL_Texture* loadTexture(const std::string& path);
+SDL_Texture* loadTextTexture(std::string text, SDL_Color color);
 bool loadMedia();
 bool initGame();
 bool rectsIntersects(const SDL_Rect &a, const SDL_Rect &b);
@@ -60,6 +73,7 @@ void drawPlay();
 void drawSplash();
 void drawPaused();
 void drawGameOver();
+void drawScore();
 void drawSnake();
 void updateScene();
 void updatePlay();
@@ -76,10 +90,15 @@ void generateFood();
 void resetPlay();
 
 bool initSDL() {
-	if (SDL_Init( SDL_INIT_EVERYTHING ) == -1 ) {
-	  std::cout << " Failed to initialize SDL : " << SDL_GetError() << std::endl;
+	if(SDL_Init( SDL_INIT_EVERYTHING ) == -1 ) {
+	  std::cout << " Failed to initialize SDL: " << SDL_GetError() << std::endl;
 		return false;
 	}
+
+  if(TTF_Init() == -1) {
+    std::cout << "Failed to initialize SDL_ttf: " << TTF_GetError() << std::endl;
+    return false;
+  }
 
   window = SDL_CreateWindow(
 		"Snake",
@@ -111,7 +130,33 @@ SDL_Texture* loadTexture(const std::string &path) {
   return texture;
 }
 
+SDL_Texture* loadTextTexture(std::string text, SDL_Color color) {
+  //Get rid of preexisting texture
+	// free();
+
+  //Render text surface
+	SDL_Surface* textSurface = TTF_RenderText_Solid(scoreFont, text.c_str(), color);
+	if(!textSurface) {
+	  std::cout << "Failed to render text surface error: " << TTF_GetError() << std::endl;
+		return nullptr;
+	}
+  //Create texture from surface pixels
+  SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+  if(!textTexture) {
+	 std::cout << "Failed to create text texture from text surface error: " << SDL_GetError() << std::endl;
+	 return nullptr;
+  }
+
+  SDL_FreeSurface(textSurface);
+	return textTexture;
+}
+
 bool loadMedia() {
+  scoreFont = TTF_OpenFont("assets/Roboto-Black.ttf", SCORE_FONT_SIZE);
+	if(!scoreFont) {
+	  return false;
+	}
+
   splashTexture = loadTexture("assets/splash.png");
 	if(!splashTexture) {
 		return false;
@@ -211,6 +256,7 @@ void drawScene() {
 void drawPlay() {
   SDL_RenderClear(renderer);
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	drawScore();
   drawSnake();
   SDL_RenderCopy(renderer, foodTexture, nullptr, &foodRect);
   SDL_RenderPresent(renderer);
@@ -228,6 +274,19 @@ void drawPaused() {
 void drawGameOver() {
 	drawPlay();
 	SDL_RenderCopy(renderer, gameOverTexture, nullptr, &gameOverRect);
+}
+
+void drawScore() {
+  if(scoreTexture) {
+		SDL_DestroyTexture(scoreTexture);
+	}
+
+	scoreTexture = loadTextTexture(std::to_string(score), SCORE_FONT_COLOR);
+	int scoreRectW, scoreRectH;
+	SDL_QueryTexture(scoreTexture, nullptr, nullptr, &scoreRectW, &scoreRectH);
+
+	scoreRect = { SCREEN_WIDTH - scoreRectW, 0, scoreRectW, scoreRectH };
+	SDL_RenderCopy(renderer, scoreTexture, nullptr, &scoreRect);
 }
 
 void drawSnake() {
@@ -313,6 +372,7 @@ void updateSnake() {
 
   // check collisions of snake with food
 	if(rectsIntersects(headRect, foodRect)) {
+		score += 50;
 		generateFood();
 	}
 	else {
@@ -399,6 +459,8 @@ void generateFood() {
 }
 
 void resetPlay() {
+
+  score = 0;
 
   snakeDirection = SNAKE_DIRECTIONS::DOWN;
   snakeSegmentRects.clear();
